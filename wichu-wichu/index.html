@@ -1,1 +1,60 @@
-Add Wichu-Wichu game.
+
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#17152f">
+<title>Wichu-Wichu — ANLEB9</title>
+<style>
+:root{color-scheme:dark;--bg:#17152f;--ink:#fff;--muted:#c9c5e8;--pink:#ff5eaa;--cyan:#45e0d0;--yellow:#ffd45a}
+*{box-sizing:border-box}body{margin:0;min-height:100svh;background:radial-gradient(circle at 50% 0,#39316d 0,var(--bg) 58%);font-family:system-ui,-apple-system,Segoe UI,sans-serif;color:var(--ink);display:flex;justify-content:center;padding:18px 14px 28px}
+main{width:min(100%,520px);display:flex;flex-direction:column;gap:14px}.brand{text-align:center}.tag{font-size:12px;letter-spacing:3px;color:var(--cyan);font-weight:800}.brand h1{font-size:clamp(34px,9vw,48px);margin:2px 0 0;line-height:1.05;font-weight:1000;letter-spacing:-1.5px}.brand h1 span{color:var(--pink)}.sub{color:var(--muted);margin:7px 0 0;font-size:14px}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}.stat{background:#ffffff12;border:1px solid #ffffff20;border-radius:14px;padding:9px 4px;text-align:center}.stat small{display:block;color:var(--muted);font-size:11px}.stat strong{font-size:21px}
+.card{background:linear-gradient(160deg,#2d2858,#211e43);border:1px solid #ffffff20;border-radius:24px;padding:16px;box-shadow:0 14px 36px #0004}.arena{min-height:310px;display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:repeat(3,1fr);gap:10px;align-items:center;justify-items:center;touch-action:manipulation}
+.orb{width:min(100%,94px);aspect-ratio:1;border:0;border-radius:50%;box-shadow:inset -7px -9px 0 #0002,0 7px 16px #0005;cursor:pointer;transition:transform .08s;touch-action:manipulation}.orb:active{transform:scale(.91)}
+.purple{background:linear-gradient(145deg,#c0a9ff,#8058f5)}.cyan{background:linear-gradient(145deg,#8bfff1,#21bfae)}.pink{background:linear-gradient(145deg,#ffacd2,#f04491)}.yellow{background:linear-gradient(145deg,#fff0a0,#f6b82e)}.red{background:linear-gradient(145deg,#ff9aa2,#ed263f)}
+.actions{display:flex;gap:10px;flex-wrap:wrap}.btn{border:0;border-radius:15px;padding:14px 18px;font-weight:850;font-size:15px;cursor:pointer;flex:1;min-width:120px}.primary{background:linear-gradient(90deg,var(--pink),#a477ff);color:white}.secondary{background:#ffffff18;color:white;border:1px solid #ffffff30}
+.help{font-size:13px;color:var(--muted);line-height:1.5;margin:0}.message{text-align:center;min-height:24px;font-weight:750;color:var(--yellow)}
+.overlay{position:fixed;inset:0;background:#100e24d9;display:flex;align-items:center;justify-content:center;padding:22px;z-index:3}.dialog{width:min(100%,420px);background:#28234f;border:1px solid #ffffff30;border-radius:24px;padding:24px;text-align:center;box-shadow:0 20px 60px #0008}.dialog h2{font-size:28px;margin:0 0 8px}.dialog p{color:var(--muted);line-height:1.5}.hidden{display:none!important}
+@media(max-height:720px){.arena{min-height:245px}.orb{width:min(100%,76px)}}
+</style>
+</head>
+<body>
+<main>
+<header class="brand"><div class="tag">UN JUEGO DE ANLEB</div><h1>WICHU<span>-WICHU</span></h1><p class="sub">¡Reflejos rápidos, colores brillantes y mucha diversión!</p></header>
+<section class="stats" aria-label="Estadísticas"><div class="stat"><small>PUNTOS</small><strong id="score">0</strong></div><div class="stat"><small>NIVEL</small><strong id="level">1</strong></div><div class="stat"><small>VIDAS</small><strong id="lives">3</strong></div><div class="stat"><small>RÉCORD</small><strong id="best">0</strong></div></section>
+<section class="card"><div class="arena" id="arena"></div><p class="message" id="message" aria-live="polite">Pulsa EMPEZAR para jugar</p><div class="actions"><button class="btn primary" id="start">EMPEZAR</button><button class="btn secondary" id="pause">PAUSAR</button><button class="btn secondary" id="reset">REINICIAR</button></div><div class="actions"><button class="btn secondary" id="mute">🔊 EFECTOS</button><button class="btn secondary" id="music">🎼 MÚSICA</button></div></section>
+<p class="help">Cómo jugar: toca las bolas de colores y evita siempre la bola roja. Cada acierto suma 10 puntos. Necesitas 8 aciertos para superar un nivel. Si cometes 3 fallos, vuelves al último punto de control (cada 5 niveles).</p>
+</main>
+<section class="overlay" id="intro"><div class="dialog"><h2>🌈 ¡Wichu-Wichu!</h2><p>Consigue puntos tocando las bolas de colores. ¡Cuidado con la roja! Cada 5 niveles guardas un punto de control.</p><button class="btn primary" id="play">¡A JUGAR!</button></div></section>
+<script>
+(()=>{'use strict';
+const $=id=>document.getElementById(id),arena=$('arena'),colors=['purple','cyan','pink','yellow'];
+let score=0,level=1,lives=3,hits=0,playing=false,paused=false,best=0,checkpoint=1,soundOn=true,musicOn=true,audio=null,musicTimer=null,musicStep=0;
+try{best=Number(localStorage.getItem('ww_best')||0);checkpoint=Math.max(1,Number(localStorage.getItem('ww_checkpoint')||1));}catch(e){}
+const melody=[[392,494,587],[440,523,659],[349,440,523],[392,494,587],[330,392,494],[349,440,523],[294,392,494],[330,392,494]];
+function ctx(){audio=audio||(new(window.AudioContext||window.webkitAudioContext)());if(audio.state==='suspended')audio.resume();return audio;}
+function tone(f,d=.12,wave='sine',vol=.04,end=null){if(!soundOn)return;try{let c=ctx(),o=c.createOscillator(),g=c.createGain();o.type=wave;o.frequency.setValueAtTime(f,c.currentTime);if(end)o.frequency.exponentialRampToValueAtTime(end,c.currentTime+d);g.gain.setValueAtTime(.0001,c.currentTime);g.gain.exponentialRampToValueAtTime(vol,c.currentTime+.02);g.gain.exponentialRampToValueAtTime(.0001,c.currentTime+d);o.connect(g);g.connect(c.destination);o.start();o.stop(c.currentTime+d+.02);}catch(e){}}
+function note(f,t,d,v){try{let c=ctx(),o=c.createOscillator(),g=c.createGain(),filter=c.createBiquadFilter();o.type='sine';o.frequency.setValueAtTime(f,t);filter.type='lowpass';filter.frequency.value=1250;g.gain.setValueAtTime(.0001,t);g.gain.linearRampToValueAtTime(v,t+.18);g.gain.setValueAtTime(v*.7,t+d*.65);g.gain.exponentialRampToValueAtTime(.0001,t+d);o.connect(filter);filter.connect(g);g.connect(c.destination);o.start(t);o.stop(t+d+.03);}catch(e){}}
+function musicTick(){if(!musicOn||!audio)return;let t=audio.currentTime+.04,ch=melody[musicStep++%melody.length];ch.forEach((f,i)=>note(f,t,1.05,i? .006:.008));note(ch[2]*2,t+.28,.48,.006);}
+function startMusic(){if(!musicOn)return;try{ctx();clearInterval(musicTimer);musicTick();musicTimer=setInterval(musicTick,1150);}catch(e){}}
+function stopMusic(){clearInterval(musicTimer);musicTimer=null;}
+function update(){ $('score').textContent=score;$('level').textContent=level;$('lives').textContent=lives;$('best').textContent=best;}
+function say(t){$('message').textContent=t;}
+function save(){try{localStorage.setItem('ww_best',best);localStorage.setItem('ww_checkpoint',checkpoint);}catch(e){}}
+function board(){arena.innerHTML='';let red=Math.floor(Math.random()*9);for(let i=0;i<9;i++){let b=document.createElement('button');b.type='button';b.className='orb '+(i===red?'red':colors[Math.floor(Math.random()*4)]);b.setAttribute('aria-label',i===red?'Bola roja, no tocar':'Bola de color, tocar');b.addEventListener('click',()=>hit(i===red));arena.appendChild(b);}}
+function hit(red){if(!playing||paused)return;if(red){lives--;tone(230,.24,'triangle',.075,115);say('¡Uy! La roja no se toca.');}else{score+=10;hits++;tone(660,.11,'sine',.045,880);setTimeout(()=>tone(990,.13,'sine',.035,1180),85);say(hits>=8?'¡Nivel superado! 🎉':'¡Muy bien! +10 puntos');}if(score>best){best=score;save();}if(lives<=0){stopMusic();tone(330,.18,'triangle',.05,220);level=checkpoint;score=0;hits=0;lives=3;playing=false;paused=false;$('start').textContent='VOLVER A JUGAR';say('Has perdido una vida. ¡Inténtalo otra vez!');update();board();return;}if(hits>=8){level++;hits=0;tone(523,.13,'sine',.04,659);if((level-1)%5===0){checkpoint=level;save();say('¡Punto de control guardado! ⭐');}}update();board();}
+function start(){if(!playing){playing=true;paused=false;$('start').textContent='EN JUEGO';say('¡Vamos! Evita la bola roja.');board();startMusic();}else if(paused){paused=false;say('¡Seguimos!');startMusic();}}
+function pause(){if(!playing)return;paused=!paused;if(paused)stopMusic();else startMusic();say(paused?'Juego en pausa':'¡Seguimos!');}
+function reset(){stopMusic();score=0;level=1;lives=3;hits=0;checkpoint=1;playing=false;paused=false;$('start').textContent='EMPEZAR';update();board();say('Partida nueva. ¡Buena suerte!');save();}
+$('start').addEventListener('click',()=>{tone(520,.055,'sine',.025,430);start();});
+$('play').addEventListener('click',()=>{$('intro').classList.add('hidden');tone(520,.055,'sine',.025,430);start();});
+$('pause').addEventListener('click',pause);$('reset').addEventListener('click',reset);
+$('mute').addEventListener('click',()=>{soundOn=!soundOn;$('mute').textContent=soundOn?'🔊 EFECTOS':'🔇 EFECTOS';if(soundOn)tone(520,.055);});
+$('music').addEventListener('click',()=>{musicOn=!musicOn;$('music').textContent=musicOn?'🎼 MÚSICA':'🔇 MÚSICA';if(musicOn&&playing&&!paused)startMusic();else stopMusic();});
+board();update();
+})();
+</script>
+</body>
+</html>
